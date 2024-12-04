@@ -1,7 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from backend.app import transcribe_audio, generate_minutes, create_docx
+from backend.app import transcribe_audio, generate_minutes, create_docx, rate_limiter
+from typing import Optional
 import os
 from urllib.parse import unquote
 import logging
@@ -46,6 +47,28 @@ def root(request: Request = None):
         'client_host': client_host
     }
     
+@app.get("/v1/rate-limit-status", tags=["Rate Limit"])
+async def get_rate_limit_status(request: Request):
+    """Get current rate limit status"""
+    client_ip = request.client.host
+    return rate_limiter.check_status(client_ip)
+
+@app.post("/v1/start-cycle", tags=["Rate Limit"])
+async def start_cycle(request: Request):
+    """Start a new transcription cycle"""
+    client_ip = request.client.host
+    is_allowed, rate_info = rate_limiter.start_cycle(client_ip)
+    
+    if not is_allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Rate limit exceeded",
+                "rate_limit_info": rate_info
+            }
+        )
+    return rate_info
+    
 @app.post("/v1/upload_audio/")
 async def upload_audio(file: UploadFile = File(...)):
     logger.info(f"Received file upload request: {file.filename}")
@@ -65,8 +88,21 @@ async def upload_audio(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/v1/transcribe/{filename}")
-async def transcribe(filename: str):
+async def transcribe(
+    filename: str,
+    request: Request,
+    session_id: str
+):
     try:
+        # get rate limit status
+        rate_info = rate_limiter.check_status(request.client.host)
+        
+        if not rate_info["active_cycle"] or rate_info["session_id"] != session_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No active transcription cycle. Please start a new cycle"
+            )
+            
         # Decode the URL-encoded filename
         decoded_filename = unquote(filename)
         file_path = os.path.join(TEMP_DIR, decoded_filename)
@@ -87,7 +123,11 @@ async def transcribe(filename: str):
             
         transcript = await transcribe_audio(file_path)
         logger.info("Transcription completed successfully")
-        return {"transcript": transcript}
+        
+        return {
+            "transcript": transcript,
+            "rate_limit_info": rate_info
+        }
         
     except HTTPException:
         raise
@@ -99,11 +139,21 @@ async def transcribe(filename: str):
 
 class MinutesRequest(BaseModel):
     transcript: str
+    session_id: Optional[str] = None
     
 @app.post("/v1/generate_minutes")
-async def generate(request: MinutesRequest):
+async def generate(request: MinutesRequest, req: Request):
     logger.info("Starting minutes generation")
     try:
+        if request.session_id:
+            rate_info = rate_limiter.check_status(req.client.host)
+            
+            if not rate_info["active_cycle"] or rate_info["session_id"] != request.session_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No active transcription cycle. Please start a new cycle."
+                )
+            
         # generate minutes content
         minutes_content = await generate_minutes(request.transcript)
         

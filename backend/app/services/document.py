@@ -13,7 +13,7 @@ def create_docx(minutes_data: dict) -> str:
     
     # Add summary section
     if 'summary' in minutes_data:
-        doc.add_heading('Executive Summary', 1)
+        doc.add_heading('Summary', 1)
         doc.add_paragraph(minutes_data['summary'])
     
     # Add key points
@@ -29,7 +29,7 @@ def create_docx(minutes_data: dict) -> str:
         doc.add_heading('Action Items', 1)
         for item in minutes_data['action_items']:
             p = doc.add_paragraph()
-            p.add_run('→ ').bold = True
+            p.add_run('• ').bold = True
             p.add_run(item)
     
     # Add decisions
@@ -37,7 +37,7 @@ def create_docx(minutes_data: dict) -> str:
         doc.add_heading('Decisions', 1)
         for decision in minutes_data['decisions']:
             p = doc.add_paragraph()
-            p.add_run('✓ ').bold = True
+            p.add_run('• ').bold = True
             p.add_run(decision)
     
     # Ensure temp directory exists
