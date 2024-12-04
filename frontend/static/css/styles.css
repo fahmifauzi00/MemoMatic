@@ -1,0 +1,45 @@
+/* Main container styling */
+.main > div {
+    padding: 2rem;
+}
+
+/* Title styling */
+.minutes-title {
+    text-align: center;
+    color: #1E88E5;
+    padding: 1rem 0;
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+/* Section headers */
+.section-title {
+    color: #1E88E5;
+    padding-top: 1.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    border-bottom: 2px solid #E3F2FD;
+}
+
+/* Button styling */
+.stButton > button {
+    width: 100%;
+    margin-top: 1rem;
+    background-color: #1E88E5;
+    color: white;
+}
+
+.stButton > button:hover {
+    background-color: #0D47A1;
+}
+
+
+/* Upload area styling */
+.uploadedFile {
+    background-color: #F5F5F5;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
