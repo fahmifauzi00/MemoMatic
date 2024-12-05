@@ -4,6 +4,13 @@ import os
 import json
 from utils.style_utils import load_css
 
+class FileState:
+    def __init__(self):
+        self.uploaded = False
+        self.path = None
+        self.name = None
+        self.size = None
+
 # get the absolute path to the project root directory
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TEMP_DIR = os.path.join(PROJECT_ROOT, "temp")
@@ -25,10 +32,8 @@ if 'transcript' not in st.session_state:
     st.session_state.transcript = None
 if 'active_session' not in st.session_state:
     st.session_state.active_session = None
-if 'file_upload' not in st.session_state:
-    st.session_state.file_uploaded = False
-if 'current_file' not in st.session_state:
-    st.session_state.current_file = None
+if 'file_state' not in st.session_state:
+    st.session_state.file_state = FileState()
     
 def check_rate_limit_status():
     """Check current rate limit status"""
@@ -97,30 +102,75 @@ def start_new_cycle():
         return None
     
 def handle_file_upload(audio_file):
-    """Handle file upload only if necessary"""
-    if not st.session_state.file_uploaded or st.session_state.current_file != audio_file.name:
-        try:
-            # Save file
-            file_path = os.path.join(TEMP_DIR, audio_file.name)
-            with open(file_path, "wb") as f:
-                f.write(audio_file.getbuffer())
-                
-            # Upload file
-            response = requests.post(
-                f"{API_BASE_URL}/upload_audio/",
-                files={"file": audio_file}
-            )
-            response.raise_for_status()
-            
-            # Update session state
-            st.session_state.file_uploaded = True
-            st.session_state.current_file = audio_file.name
-            return True
-            
-        except Exception as e:
-            st.error(f"Error uploading file: {str(e)}")
-            return False
-    return True
+    """Handle file upload with caching"""
+    if audio_file is None:
+        return False
+        
+    current_state = st.session_state.file_state
+    
+    # Check if this is the same file
+    if (current_state.name == audio_file.name and 
+        current_state.uploaded and 
+        current_state.size == audio_file.size):
+        return True
+        
+    # New file needs to be uploaded
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/upload_audio",
+            files={"file": audio_file}
+        )
+        response.raise_for_status()
+        
+        # Update file state
+        current_state.uploaded = True
+        current_state.name = audio_file.name
+        current_state.size = audio_file.size
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Error uploading file: {str(e)}")
+        current_state.uploaded = False
+        current_state.name = None
+        current_state.size = None
+        return False
+
+def display_minutes(minutes_data):
+    """Display formatted minutes"""
+    st.markdown("---")
+    st.markdown(f"<h1 class='minutes-title'>{minutes_data['title']}</h1>",
+                unsafe_allow_html=True)
+    
+    # Summary
+    st.markdown("<h2 class='section-title'>Summary</h2>", 
+                unsafe_allow_html=True)
+    st.markdown(f"<div class='summary-section'>{minutes_data['summary']}</div>", 
+                unsafe_allow_html=True)
+    
+    # Key Points
+    if minutes_data.get('key_points'):
+        st.markdown("<h2 class='section-title'>Key Points</h2>", 
+                    unsafe_allow_html=True)
+        for point in minutes_data['key_points']:
+            st.markdown(f"<div class='key-point-item'>• {point}</div>", 
+                        unsafe_allow_html=True)
+    
+    # Action Items
+    if minutes_data.get('action_items'):
+        st.markdown("<h2 class='section-title'>Action Items</h2>", 
+                    unsafe_allow_html=True)
+        for item in minutes_data['action_items']:
+            st.markdown(f"<div class='action-item'>• {item}</div>",
+                        unsafe_allow_html=True)
+    
+    # Decisions
+    if minutes_data.get('decisions'):
+        st.markdown("<h2 class='section-title'>Decisions</h2>", 
+                    unsafe_allow_html=True)
+        for decision in minutes_data['decisions']:
+            st.markdown(f"<div class='decision-item'>• {decision}</div>",
+                        unsafe_allow_html=True)
 
 # main app    
 st.title("Memomatic")
@@ -133,7 +183,8 @@ display_rate_limit_info()
 audio_file = st.file_uploader(
     "Upload your meeting recording (Supported formats: MP3, WAV)",
     type=["mp3", "wav"],
-    help="Maximum file size: 200MB"
+    help="Maximum file size: 200MB",
+    key="audio_upload"
 )
 
 if audio_file:
@@ -180,41 +231,7 @@ if audio_file:
                         try:
                             # Parse and display minutes
                             minutes_data = json.loads(minutes_content)
-                            
-                            # Display formatted minutes
-                            st.markdown("---")
-                            st.markdown(f"<h1 class='minutes-title'>{minutes_data['title']}</h1>",
-                                        unsafe_allow_html=True)
-                            
-                            # Summary
-                            st.markdown("<h2 class='section-title'>Summary</h2>", 
-                                        unsafe_allow_html=True)
-                            st.markdown(f"<div class='summary-section'>{minutes_data['summary']}</div>", 
-                                        unsafe_allow_html=True)
-                            
-                            # Key Points
-                            if minutes_data.get('key_points'):
-                                st.markdown("<h2 class='section-title'>Key Points</h2>", 
-                                            unsafe_allow_html=True)
-                                for point in minutes_data['key_points']:
-                                    st.markdown(f"<div class='key-point-item'>• {point}</div>", 
-                                                unsafe_allow_html=True)
-                            
-                            # Action Items
-                            if minutes_data.get('action_items'):
-                                st.markdown("<h2 class='section-title'>Action Items</h2>", 
-                                            unsafe_allow_html=True)
-                                for item in minutes_data['action_items']:
-                                    st.markdown(f"<div class='action-item'>• {item}</div>",
-                                                unsafe_allow_html=True)
-                            
-                            # Decisions
-                            if minutes_data.get('decisions'):
-                                st.markdown("<h2 class='section-title'>Decisions</h2>", 
-                                            unsafe_allow_html=True)
-                                for decision in minutes_data['decisions']:
-                                    st.markdown(f"<div class='decision-item'>• {decision}</div>",
-                                                unsafe_allow_html=True)
+                            display_minutes(minutes_data)
                             
                             # Download button
                             docx_path = os.path.join(TEMP_DIR, "minutes.docx")
@@ -225,7 +242,7 @@ if audio_file:
                                         data=docx_file,
                                         file_name="meeting_minutes.docx",
                                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                        key="download_minutes"
+                                        key="download_btn"
                                     )
                             else:
                                 st.error("Error: Generated document not found.")

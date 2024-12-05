@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from backend.app import transcribe_audio, generate_minutes, create_docx, rate_limiter
+from backend.app import transcribe_audio, generate_minutes, create_docx, rate_limiter, file_cache
 from typing import Optional
 import os
 from urllib.parse import unquote
@@ -69,9 +69,16 @@ async def start_cycle(request: Request):
         )
     return rate_info
     
-@app.post("/v1/upload_audio/")
+@app.post("/v1/upload_audio")
 async def upload_audio(file: UploadFile = File(...)):
+    """Handle file upload with caching"""
     logger.info(f"Received file upload request: {file.filename}")
+    
+    # Check if file already exists in cache
+    if file_cache.file_exists(file.filename):
+        logger.info(f"File {file.filename} already exists in cache")
+        return {"filename": file.filename}
+    
     try:
         file_path = os.path.join(TEMP_DIR, file.filename)
         logger.info(f"Saving file to: {file_path}")
@@ -81,7 +88,10 @@ async def upload_audio(file: UploadFile = File(...)):
             buffer.write(content)
             logger.info(f"File saved successfully, size: {len(content)} bytes")
             
+        # Add file to cache
+        file_cache.add_file(file.filename, file_path)
         return {"filename": file.filename}
+        
     except Exception as e:
         error_msg = f"Error uploading file: {str(e)}"
         logger.error(error_msg)
@@ -93,33 +103,27 @@ async def transcribe(
     request: Request,
     session_id: str
 ):
+    """Transcribe audio using cached file"""
     try:
-        # get rate limit status
+        # Validate session
         rate_info = rate_limiter.check_status(request.client.host)
-        
         if not rate_info["active_cycle"] or rate_info["session_id"] != session_id:
             raise HTTPException(
                 status_code=400,
-                detail="No active transcription cycle. Please start a new cycle"
+                detail="No active transcription cycle. Please start a new cycle."
             )
             
-        # Decode the URL-encoded filename
+        # Get file from cache
         decoded_filename = unquote(filename)
-        file_path = os.path.join(TEMP_DIR, decoded_filename)
-        logger.info(f"Starting transcription for file: {decoded_filename}")
+        file_path = file_cache.get_file_path(decoded_filename)
         
-        # Check if file exists
-        if not os.path.exists(file_path):
-            error_msg = f"File not found: {decoded_filename}"
-            logger.error(error_msg)
-            raise HTTPException(status_code=404, detail=error_msg)
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {decoded_filename}")
         
         # Check file size
         file_size = os.path.getsize(file_path)
         if file_size == 0:
-            error_msg = "File is empty"
-            logger.error(error_msg)
-            raise HTTPException(status_code=400, detail=error_msg)
+            raise HTTPException(status_code=400, detail="File is empty")
             
         transcript = await transcribe_audio(file_path)
         logger.info("Transcription completed successfully")

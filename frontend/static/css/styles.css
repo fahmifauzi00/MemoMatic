@@ -23,6 +23,10 @@
     border-bottom: 2px solid #E3F2FD;
 }
 
+.download_btn {
+    padding-top: 1rem;
+}
+
 /* Button styling */
 .stButton > button {
     width: 100%;
@@ -35,6 +39,9 @@
     background-color: #0D47A1;
 }
 
+.stDownloadButton {
+    padding-top: 1.5rem;
+}
 
 /* Upload area styling */
 .uploadedFile {
