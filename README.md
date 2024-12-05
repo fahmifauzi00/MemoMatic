@@ -2,7 +2,10 @@
 
 MemoMatic is a streamlined meeting minutes generator that automatically transcribes audio recordings and generates formatted meeting minutes using AI. Built with FastAPI and Streamlit, it provides an intuitive interface for converting meeting recordings into professional, structured documents.
 
-[Screenshot of MemoMatic main interface]
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/3b9de95d-d8ed-4f8f-9eec-7ecbd1531a0c" width="800" alt="MemoMatic Main Interface"/>
+</div>
+
 
 ## Features
 
@@ -18,7 +21,10 @@ MemoMatic is a streamlined meeting minutes generator that automatically transcri
   - Decisions
 - 🎨 **Clean, Intuitive UI**: User-friendly interface built with Streamlit
 
-[Screenshot of generated minutes example]
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/b05d1f56-b404-4580-98f9-11b41cf98380" width="600" alt="Generated Minutes Example"/>
+</div>
+
 
 ## How It Works
 
@@ -28,7 +34,10 @@ MemoMatic is a streamlined meeting minutes generator that automatically transcri
 4. **Generation**: Formatted minutes are generated with proper structure
 5. **Download**: User can review and download the minutes as a DOCX file
 
-[Workflow diagram/illustration]
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/f5c0d91b-7784-49d5-b9da-4eba5d19b8b3" width="600" alt="MemoMatic workflow"/>
+</div>
+
 
 ## User Flow
 
